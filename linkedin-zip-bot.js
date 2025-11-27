@@ -83,13 +83,32 @@ class LinkedInZipBot {
   }
 
   /**
+   * Find and click the launch button if it exists
+   */
+  async findAndClickLaunchButton() {
+    console.log('🔍 Looking for launch button...');
+    const launchButton = document.querySelector('#launch-footer-start-button');
+
+    if (launchButton) {
+      console.log('✅ Found launch button, clicking...');
+      launchButton.click();
+      console.log('⏳ Waiting for game to load...');
+      await this.sleep(2000); // Wait for game to load after clicking
+      return true;
+    } else {
+      console.log('ℹ️ Launch button not found, game may already be started');
+      return false;
+    }
+  }
+
+  /**
    * Wait for the game board to load
    */
   async waitForGameBoard(timeout = 10000) {
     console.log('⏳ Waiting for game board to load...');
 
-    // First, check if it's already there
-    let gameBoard = document.querySelector('.trail-board');
+    // First, check if it's already there (try both selectors)
+    let gameBoard = document.querySelector('[data-testid="interactive-grid"]') || document.querySelector('.trail-board');
     let cells = document.querySelectorAll('[data-cell-idx]');
 
     if (gameBoard && cells.length > 0) {
@@ -102,7 +121,7 @@ class LinkedInZipBot {
     const startTime = Date.now();
 
     while (Date.now() - startTime < timeout) {
-      gameBoard = document.querySelector('.trail-board');
+      gameBoard = document.querySelector('[data-testid="interactive-grid"]') || document.querySelector('.trail-board');
       cells = document.querySelectorAll('[data-cell-idx]');
 
       if (gameBoard && cells.length > 0) {
@@ -356,8 +375,14 @@ class LinkedInZipBot {
    * Simulate a keyboard event
    */
   simulateKeyPress(key) {
-    const board = document.querySelector('[data-trail-grid]');
-    if (!board) return false;
+    // Try both signed-in and signed-out selectors
+    const board = document.querySelector('[data-testid="interactive-grid"]') ||
+                  document.querySelector('.trail-board') ||
+                  document.querySelector('[data-trail-grid]');
+    if (!board) {
+      console.warn('⚠️ Board not found for key event');
+      return false;
+    }
 
     const keydownEvent = new KeyboardEvent('keydown', {
       key: key,
@@ -390,11 +415,11 @@ class LinkedInZipBot {
     }
 
     console.log('Starting to solve puzzle with arrow keys...');
-    // board element is of class trail-board
+    // board element can be either .trail-board or [data-testid="interactive-grid"]
 
     // wait for game board to be ready
     await this.waitForGameBoard(10000);
-    const board = document.querySelector('.trail-board');
+    const board = document.querySelector('[data-testid="interactive-grid"]') || document.querySelector('.trail-board');
 
     if (!board) {
       console.error('Game board not found!');
@@ -491,20 +516,9 @@ class LinkedInZipBot {
   async run() {
     console.log('🤖 LinkedIn Zip Bot Starting...\n');
 
-    // Step 1: Check for and click the launch button
-      console.log('\nStep 1: Checking for launch button...');
-      const launchButton = document.querySelector('#launch-footer-start-button');
-
-      if (launchButton) {
-        console.log('✅ Found launch button, clicking...');
-        launchButton.click();
-        console.log('⏳ Waiting for game to load...');
-        await this.sleep(1); // Wait for game to load after clicking
-      } else {
-        console.log('ℹ️ Launch button not found, game may already be started');
-      }
-
     try {
+      // Step 1: Check for and click the launch button
+      await this.findAndClickLaunchButton();
       // Step 1: Detect API URL
       console.log('\nStep 1: Detecting API URL...');
       this.apiUrl = await this.detectApiUrl();
@@ -519,7 +533,7 @@ class LinkedInZipBot {
 
       // Step 3: Solve puzzle
       console.log('\nStep 3: Solving puzzle...');
-      await this.solvePuzzle(0); // 10ms delay between cells
+      await this.solvePuzzle(80); // 150ms delay between cells (human-like speed)
 
       console.log('\n✅ Bot completed successfully!');
     } catch (error) {
